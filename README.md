@@ -3,7 +3,7 @@
 ArgoCD Application manifests - Single Source of Truth for cluster state.
 
 ## Structure
-├── apps/ │ ├── platform/ # ArgoCD, Prometheus, Loki, Grafana │ └── services/ # App Helm releases ├── environments/ │ ├── dev/ # Dev values overrides │ └── prod/ # Prod values overrides └── app-of-apps.yaml # Root ArgoCD application
+├── apps/ │ ├── platform/ # ArgoCD, Prometheus, Loki, Grafana │ └── services/ # App Helm releases ├── environments/ │ ├── dev/ # Dev values overrides │ └── prod/ # Prod values overrides └── app-of-apps.yaml # Root ArgoCD application,
 
 
 ## How It Works
