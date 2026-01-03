@@ -1,0 +1,19 @@
+# ArgoCD App-of-Apps
+# This will be implemented in Sprint 3 (Epic 6)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-root
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/TechITFactory/techitfactory-gitops.git
+    targetRevision: main
+    path: apps
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
