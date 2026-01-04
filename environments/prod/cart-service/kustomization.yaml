@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: techitfactory-prod
+
+resources:
+  - ../../../base/cart-service
+
+images:
+  - name: IMAGE_PLACEHOLDER
+    newName: <AWS_ACCOUNT>.dkr.ecr.ap-south-1.amazonaws.com/techitfactory/cart-service
+    newTag: v1.0.0
+
+replicas:
+  - name: cart-service
+    count: 3

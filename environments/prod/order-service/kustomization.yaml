@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: techitfactory-prod
+
+resources:
+  - ../../../base/order-service
+
+images:
+  - name: IMAGE_PLACEHOLDER
+    newName: <AWS_ACCOUNT>.dkr.ecr.ap-south-1.amazonaws.com/techitfactory/order-service
+    newTag: v1.0.0
+
+replicas:
+  - name: order-service
+    count: 3

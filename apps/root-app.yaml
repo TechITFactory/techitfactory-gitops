@@ -1,0 +1,29 @@
+# =============================================================================
+# ROOT APPLICATION - APP OF APPS
+# =============================================================================
+# This is the root application that manages all other applications.
+# ArgoCD watches this and syncs all child applications automatically.
+# =============================================================================
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root-app
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/TechITFactory/techitfactory-gitops.git
+    targetRevision: main
+    path: apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true      # Delete resources when removed from git
+      selfHeal: true   # Revert manual changes
+    syncOptions:
+      - CreateNamespace=true

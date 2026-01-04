@@ -1,0 +1,107 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: techitfactory-alerts
+  namespace: monitoring
+  labels:
+    release: prometheus
+    app: kube-prometheus-stack
+spec:
+  groups:
+    # Application Alerts
+    - name: techitfactory.apps
+      rules:
+        - alert: PodNotReady
+          expr: kube_pod_status_ready{namespace="techitfactory", condition="true"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Pod not ready"
+            description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has been not ready for 5 minutes"
+
+        - alert: PodCrashLooping
+          expr: rate(kube_pod_container_status_restarts_total{namespace="techitfactory"}[15m]) > 0.5
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Pod crash looping"
+            description: "Pod {{ $labels.pod }} is crash looping"
+
+        - alert: HighPodCPU
+          expr: |
+            (sum(rate(container_cpu_usage_seconds_total{namespace="techitfactory"}[5m])) by (pod) 
+            / sum(kube_pod_container_resource_requests{namespace="techitfactory", resource="cpu"}) by (pod)) > 0.8
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High CPU usage"
+            description: "Pod {{ $labels.pod }} CPU usage is above 80%"
+
+        - alert: HighPodMemory
+          expr: |
+            (sum(container_memory_usage_bytes{namespace="techitfactory"}) by (pod)
+            / sum(kube_pod_container_resource_limits{namespace="techitfactory", resource="memory"}) by (pod)) > 0.8
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High memory usage"
+            description: "Pod {{ $labels.pod }} memory usage is above 80%"
+
+    # HTTP Alerts
+    - name: techitfactory.http
+      rules:
+        - alert: HighErrorRate
+          expr: |
+            sum(rate(http_requests_total{namespace="techitfactory", status=~"5.."}[5m])) 
+            / sum(rate(http_requests_total{namespace="techitfactory"}[5m])) > 0.05
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "High HTTP error rate"
+            description: "More than 5% of requests are failing"
+
+        - alert: HighLatency
+          expr: |
+            histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{namespace="techitfactory"}[5m])) by (le, service)) > 1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High latency"
+            description: "P99 latency for {{ $labels.service }} is above 1 second"
+
+    # Infrastructure Alerts
+    - name: techitfactory.infra
+      rules:
+        - alert: NodeHighCPU
+          expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Node CPU high"
+            description: "Node {{ $labels.instance }} CPU usage is above 80%"
+
+        - alert: NodeHighMemory
+          expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 80
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Node memory high"
+            description: "Node {{ $labels.instance }} memory usage is above 80%"
+
+        - alert: PersistentVolumeAlmostFull
+          expr: |
+            (kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "PV almost full"
+            description: "PersistentVolume {{ $labels.persistentvolumeclaim }} is {{ printf \"%.0f\" $value }}% full"

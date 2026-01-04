@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: techitfactory
+
+resources:
+  - ../../../base/frontend
+
+# Replace image placeholder with actual ECR image
+images:
+  - name: IMAGE_PLACEHOLDER
+    newName: <AWS_ACCOUNT>.dkr.ecr.ap-south-1.amazonaws.com/techitfactory/frontend
+    newTag: latest
+
+# Dev environment: 2 replicas
+replicas:
+  - name: frontend
+    count: 2
+
+# Add environment-specific configuration
+patches:
+  - patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: ENVIRONMENT
+          value: dev
+    target:
+      kind: Deployment
+      name: frontend
