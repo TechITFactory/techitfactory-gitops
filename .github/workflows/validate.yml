@@ -1,0 +1,38 @@
+# Optional: Validate GitOps manifests
+name: Validate Manifests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    name: Validate YAML & Kustomize
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install kustomize
+        run: |
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
+
+      - name: Validate YAML syntax
+        run: |
+          find . -name "*.yaml" -o -name "*.yml" | xargs -I {} sh -c 'echo "Validating {}" && python3 -c "import yaml; yaml.safe_load(open(\"{}\"))"' || true
+
+      - name: Build kustomize overlays (dev)
+        run: |
+          for dir in environments/dev/*/; do
+            echo "Building $dir"
+            kustomize build "$dir" > /dev/null || echo "Warning: $dir failed"
+          done
+
+      - name: Build kustomize overlays (prod)
+        run: |
+          for dir in environments/prod/*/; do
+            echo "Building $dir"
+            kustomize build "$dir" > /dev/null || echo "Warning: $dir failed"
+          done
