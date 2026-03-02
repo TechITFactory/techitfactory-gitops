@@ -45,3 +45,22 @@ spec:
         env:
         - name: NODE_ENV
           value: "production"
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: jwt-secret
+        # Optional: seed an admin user on first boot
+        # Create with: kubectl create secret generic app-secrets --from-literal=seed-admin-email=admin@techitfactory.com --from-literal=seed-admin-password=<PASS> -n techitfactory
+        - name: SEED_ADMIN_EMAIL
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: seed-admin-email
+              optional: true
+        - name: SEED_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: seed-admin-password
+              optional: true

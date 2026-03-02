@@ -13,6 +13,10 @@ spec:
     metadata:
       labels:
         app: api-gateway
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+        prometheus.io/path: "/metrics"
     spec:
       containers:
       - name: api-gateway
@@ -41,3 +45,20 @@ spec:
         env:
         - name: NODE_ENV
           value: "production"
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: jwt-secret
+        # Internal cluster DNS — no need to override in most cases
+        - name: USER_SERVICE_URL
+          value: "http://user-service"
+        - name: PRODUCT_SERVICE_URL
+          value: "http://product-service"
+        - name: ORDER_SERVICE_URL
+          value: "http://order-service"
+        - name: CART_SERVICE_URL
+          value: "http://cart-service"
+        # Comma-separated list of allowed CORS origins — override per environment
+        - name: ALLOWED_ORIGINS
+          value: "http://localhost,http://localhost:3000"
