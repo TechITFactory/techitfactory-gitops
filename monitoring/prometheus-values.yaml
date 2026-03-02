@@ -4,7 +4,16 @@
 # Grafana Configuration
 grafana:
   enabled: true
-  adminPassword: "TechITFactory123!"  # Change in production!
+  # Admin credentials are read from a Kubernetes Secret — never hardcode passwords here.
+  # Create the secret before installing:
+  #   kubectl create secret generic grafana-admin-secret \
+  #     --from-literal=admin-user=admin \
+  #     --from-literal=admin-password=<YOUR_STRONG_PASSWORD> \
+  #     -n monitoring
+  admin:
+    existingSecret: grafana-admin-secret
+    userKey: admin-user
+    passwordKey: admin-password
   
   persistence:
     enabled: true
