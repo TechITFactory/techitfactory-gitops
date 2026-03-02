@@ -9,8 +9,8 @@ resources:
 # Replace image placeholder with actual ECR image
 images:
   - name: IMAGE_PLACEHOLDER
-    newName: <AWS_ACCOUNT>.dkr.ecr.ap-south-1.amazonaws.com/techitfactory/frontend
-    newTag: latest
+    newName: 535002890483.dkr.ecr.ap-south-1.amazonaws.com/techitfactory/frontend
+    newTag: v0.1.0
 
 # Dev environment: 2 replicas
 replicas:

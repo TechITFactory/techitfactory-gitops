@@ -8,8 +8,8 @@ resources:
 
 images:
   - name: IMAGE_PLACEHOLDER
-    newName: <AWS_ACCOUNT>.dkr.ecr.ap-south-1.amazonaws.com/techitfactory/order-service
-    newTag: latest
+    newName: 535002890483.dkr.ecr.ap-south-1.amazonaws.com/techitfactory/order-service
+    newTag: v0.1.0
 
 replicas:
   - name: order-service
