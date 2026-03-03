@@ -1,5 +1,24 @@
-# Optional: Validate GitOps manifests
-name: Validate Manifests
+# =============================================================================
+# GITOPS MANIFEST VALIDATION — PRODUCTION-GRADE
+# =============================================================================
+#
+# WHAT THIS DOES:
+#   1. Validates YAML syntax — catches malformed manifests before ArgoCD tries them
+#   2. Runs kustomize build for EVERY overlay (dev + prod)
+#      A broken overlay = ArgoCD will fail to sync = silent outage
+#   3. Fails the build on ANY error — no || true, no silent warnings
+#
+# WHY THIS MATTERS:
+#   Without this, a bad kustomization.yaml commit goes straight to ArgoCD.
+#   ArgoCD then shows "SyncFailed" or applies partial config — hard to debug.
+#   This workflow is the last safety net before Git becomes source of truth.
+#
+# RUNS ON:
+#   - Every PR to main (blocks merge on broken manifests)
+#   - Every push to main (confirms what ArgoCD will actually sync)
+# =============================================================================
+
+name: Validate GitOps Manifests
 
 on:
   push:
@@ -7,32 +26,111 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   validate:
     name: Validate YAML & Kustomize
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install kustomize
+      # Pin kustomize version — avoid surprise breakage from "latest"
+      - name: Install kustomize v5.4.3
         run: |
-          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          curl -sLo kustomize.tar.gz \
+            https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz
+          tar -xzf kustomize.tar.gz
           sudo mv kustomize /usr/local/bin/
+          kustomize version
 
+      # -----------------------------------------------------------------------
+      # Step 1: YAML syntax validation
+      # Fails on the FIRST invalid file — use python-yaml since it's always
+      # available on ubuntu-latest without extra installs
+      # -----------------------------------------------------------------------
       - name: Validate YAML syntax
         run: |
-          find . -name "*.yaml" -o -name "*.yml" | xargs -I {} sh -c 'echo "Validating {}" && python3 -c "import yaml; yaml.safe_load(open(\"{}\"))"' || true
+          FAILED=0
+          while IFS= read -r -d '' file; do
+            python3 -c "
+          import yaml, sys
+          try:
+            yaml.safe_load(open('$file'))
+          except yaml.YAMLError as e:
+            print(f'INVALID YAML: $file')
+            print(str(e))
+            sys.exit(1)
+          "
+            if [ $? -ne 0 ]; then
+              FAILED=1
+            fi
+          done < <(find . -name "*.yaml" -o -name "*.yml" | grep -v ".git" | xargs -I{} printf '%s\0' {})
 
-      - name: Build kustomize overlays (dev)
+          if [ $FAILED -ne 0 ]; then
+            echo "YAML validation failed — fix the files above before merging."
+            exit 1
+          fi
+          echo "All YAML files are syntactically valid."
+
+      # -----------------------------------------------------------------------
+      # Step 2: Kustomize build — dev overlays
+      # No error suppression. If a build fails, the step fails.
+      # -----------------------------------------------------------------------
+      - name: Build dev overlays
         run: |
+          FAILED=0
           for dir in environments/dev/*/; do
-            echo "Building $dir"
-            kustomize build "$dir" > /dev/null || echo "Warning: $dir failed"
+            if [ -f "$dir/kustomization.yaml" ]; then
+              echo "Building: $dir"
+              if ! kustomize build "$dir" > /dev/null; then
+                echo "FAILED: $dir"
+                FAILED=1
+              fi
+            fi
           done
 
-      - name: Build kustomize overlays (prod)
+          if [ $FAILED -ne 0 ]; then
+            echo "One or more dev kustomize overlays failed to build."
+            exit 1
+          fi
+          echo "All dev overlays built successfully."
+
+      # -----------------------------------------------------------------------
+      # Step 3: Kustomize build — prod overlays
+      # Prod overlays are critical — broken prod = failed release
+      # -----------------------------------------------------------------------
+      - name: Build prod overlays
         run: |
+          FAILED=0
           for dir in environments/prod/*/; do
-            echo "Building $dir"
-            kustomize build "$dir" > /dev/null || echo "Warning: $dir failed"
+            if [ -f "$dir/kustomization.yaml" ]; then
+              echo "Building: $dir"
+              if ! kustomize build "$dir" > /dev/null; then
+                echo "FAILED: $dir"
+                FAILED=1
+              fi
+            fi
           done
+
+          if [ $FAILED -ne 0 ]; then
+            echo "One or more prod kustomize overlays failed to build."
+            exit 1
+          fi
+          echo "All prod overlays built successfully."
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "### GitOps Manifest Validation" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| YAML syntax | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Dev overlays (kustomize build) | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Prod overlays (kustomize build) | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
