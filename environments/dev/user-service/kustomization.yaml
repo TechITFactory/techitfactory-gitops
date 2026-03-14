@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: techitfactory
+resources:
+  - ../../../base/user-service
+images:
+  - name: IMAGE_PLACEHOLDER
+    newName: 535002890483.dkr.ecr.ap-south-1.amazonaws.com/techitfactory/user-service
+    newTag: 1fcb4c19b0199665ea8c568af737d3f163548a49
+replicas:
+  - name: user-service
+    count: 2

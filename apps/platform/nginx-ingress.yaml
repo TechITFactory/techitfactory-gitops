@@ -1,0 +1,72 @@
+# =============================================================================
+# NGINX INGRESS CONTROLLER — ArgoCD Application
+# =============================================================================
+# Installs ingress-nginx via Helm.
+# Creates a Network Load Balancer (NLB) on AWS via legacy cloud controller.
+# No ALB Controller required — works with standard EKS permissions.
+#
+# IngressClass: nginx
+# All Ingress resources in the cluster must use ingressClassName: nginx
+# =============================================================================
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nginx-ingress
+  namespace: argocd
+  annotations:
+    # Install before services so Ingress objects resolve on first sync
+    argocd.argoproj.io/sync-wave: "-2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://kubernetes.github.io/ingress-nginx
+    chart: ingress-nginx
+    targetRevision: "4.12.0"
+    helm:
+      values: |
+        controller:
+          # NLB annotation — EKS legacy cloud controller creates an NLB
+          # Does NOT require AWS Load Balancer Controller
+          service:
+            type: LoadBalancer
+            annotations:
+              service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+              service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+
+          # 2 replicas for HA — reduce to 1 to cut cost
+          replicaCount: 2
+
+          # IngressClass name used in Ingress manifests
+          ingressClassResource:
+            name: nginx
+            enabled: true
+            default: true
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+          # Prometheus metrics scraping
+          metrics:
+            enabled: true
+            serviceMonitor:
+              enabled: false  # Enable when Prometheus is running
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ingress-nginx
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

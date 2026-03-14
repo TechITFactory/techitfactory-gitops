@@ -1,0 +1,8 @@
+# Platform team owns platform apps
+apps/platform/ @TechITFactory/platform-team
+
+# App team can update service releases
+apps/services/ @TechITFactory/app-team
+
+# Prod requires additional review
+environments/prod/ @TechITFactory/platform-team @TechITFactory/leads

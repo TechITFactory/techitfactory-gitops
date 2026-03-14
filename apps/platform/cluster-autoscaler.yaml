@@ -1,0 +1,63 @@
+# =============================================================================
+# CLUSTER AUTOSCALER — ArgoCD Application
+# =============================================================================
+# Automatically scales EKS node groups up/down based on pod pending state.
+# IRSA role created by Terraform (techitfactory-dev-cluster-autoscaler).
+# =============================================================================
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cluster-autoscaler
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://kubernetes.github.io/autoscaler
+    chart: cluster-autoscaler
+    targetRevision: "9.46.6"
+    helm:
+      values: |
+        # Auto-discover node groups via cluster tag
+        autoDiscovery:
+          clusterName: techitfactory-dev
+
+        awsRegion: ap-south-1
+
+        # IRSA — ServiceAccount role for EC2 autoscaling API calls
+        rbac:
+          serviceAccount:
+            create: true
+            name: cluster-autoscaler
+            annotations:
+              eks.amazonaws.com/role-arn: arn:aws:iam::YOUR_AWS_ACCOUNT_ID:role/techitfactory-dev-cluster-autoscaler
+
+        # Scale down behavior — wait 2m before removing underutilized nodes
+        extraArgs:
+          scale-down-delay-after-add: 2m
+          scale-down-unneeded-time: 2m
+          skip-nodes-with-system-pods: "false"
+          balance-similar-node-groups: "true"
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

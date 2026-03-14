@@ -1,0 +1,80 @@
+# =============================================================================
+# ARGOCD HELM VALUES — DEV
+# =============================================================================
+# Used during initial bootstrap install via platform-bootstrap.yml workflow.
+# After bootstrap, ArgoCD can manage its own upgrades via apps/platform/argocd.yaml
+# =============================================================================
+
+global:
+  domain: ""  # Set to argocd.your-domain.com when DNS is configured
+
+server:
+  # Start with ClusterIP. Once ALB controller is installed by ArgoCD,
+  # enable the ingress below to expose the UI externally.
+  service:
+    type: ClusterIP
+
+  # ArgoCD will sit behind ALB which terminates TLS — run insecure internally
+  extraArgs:
+    - --insecure
+
+  # Ingress — uncomment once ALB controller is running
+  # ingress:
+  #   enabled: true
+  #   ingressClassName: alb
+  #   annotations:
+  #     alb.ingress.kubernetes.io/scheme: internet-facing
+  #     alb.ingress.kubernetes.io/target-type: ip
+  #     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+
+configs:
+  params:
+    # Required when running behind a reverse proxy / ALB
+    server.insecure: "true"
+
+  # Resource customization — mark resources as healthy even during rolling updates
+  resourceCustomizations: |
+    apps/Deployment:
+      health.lua: |
+        hs = {}
+        if obj.status ~= nil then
+          if obj.status.readyReplicas ~= nil then
+            if obj.status.readyReplicas >= 1 then
+              hs.status = "Healthy"
+              hs.message = "Deployment is healthy"
+              return hs
+            end
+          end
+        end
+        hs.status = "Progressing"
+        hs.message = "Deployment is progressing"
+        return hs
+
+# Redis — single instance (HA not needed for dev)
+redis-ha:
+  enabled: false
+
+redis:
+  enabled: true
+
+# Application controller
+controller:
+  replicas: 1
+
+# Repo server
+repoServer:
+  replicas: 1
+
+# Application Set controller
+applicationSet:
+  replicas: 1
+
+# Notifications controller — alerts on sync failures
+notifications:
+  enabled: true
+  # Configure Slack/email in the argocd-notifications-secret Secret
+  # See: https://argocd-notifications.readthedocs.io/en/stable/
+
+# Dex (SSO) — disabled for dev, enable for prod with your IdP
+dex:
+  enabled: false

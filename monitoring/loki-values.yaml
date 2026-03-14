@@ -1,0 +1,87 @@
+# Loki Stack Helm Values
+# Install with: helm install loki grafana/loki-stack -n monitoring -f loki-values.yaml
+
+loki:
+  auth_enabled: false
+  
+  commonConfig:
+    replication_factor: 1
+  
+  storage:
+    type: filesystem
+  
+  schemaConfig:
+    configs:
+      - from: 2024-01-01
+        store: tsdb
+        object_store: filesystem
+        schema: v12
+        index:
+          prefix: loki_index_
+          period: 24h
+
+  limits_config:
+    retention_period: 168h  # 7 days
+    ingestion_rate_mb: 10
+    ingestion_burst_size_mb: 20
+    max_streams_per_user: 10000
+    max_entries_limit_per_query: 5000
+
+# Single binary mode for dev
+singleBinary:
+  replicas: 1
+  persistence:
+    enabled: true
+    size: 50Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+# Promtail - log collector
+promtail:
+  enabled: true
+  config:
+    clients:
+      - url: http://loki:3100/loki/api/v1/push
+    
+    snippets:
+      pipelineStages:
+        - cri: {}
+        - multiline:
+            firstline: '^\d{4}-\d{2}-\d{2}'
+            max_wait_time: 3s
+        - json:
+            expressions:
+              level: level
+              msg: message
+              timestamp: timestamp
+        - labels:
+            level:
+        - timestamp:
+            source: timestamp
+            format: RFC3339
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# Disable components not needed for dev
+gateway:
+  enabled: false
+
+backend:
+  replicas: 0
+
+read:
+  replicas: 0
+
+write:
+  replicas: 0
